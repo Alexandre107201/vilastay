@@ -1,0 +1,12 @@
+{
+  "name": "Vila Stay — Gestão de hospedagem",
+  "short_name": "Vila Stay",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0F1D17",
+  "theme_color": "#0F1D17",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

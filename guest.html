@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F1D17">
+<link rel="apple-touch-icon" href="icon-512.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia da sua estadia</title>
+<meta name="description" content="Guia completo da sua estadia: chegada, Wi-Fi, dicas locais e saída.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --paper:#F7F5EF; --card:#FFFFFF; --ink:#1F3527; --green:#2E5641;
+  --green-soft:#E8EFE9; --honey:#C4862B; --honey-soft:#F6ECDC;
+  --dim:#6C7A6F; --line:#E3DFD2; --danger:#B3543F;
+  --radius:16px; --shadow:0 2px 14px rgba(31,53,39,.07);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{background:var(--paper);color:var(--ink);font-family:'Figtree',sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:640px;margin:0 auto;padding:0 20px 80px}
+h1,h2,h3,.display{font-family:'Marcellus',serif;font-weight:400}
+.mono{font-family:'IBM Plex Mono',monospace}
+a{color:var(--green)}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--honey);outline-offset:2px;border-radius:4px}
+
+/* Header */
+.brandbar{display:flex;align-items:center;justify-content:center;gap:8px;padding:22px 0 6px;color:var(--green)}
+.brandbar .mark{width:22px;height:22px;border:1.5px solid var(--green);border-radius:50% 50% 50% 4px;display:inline-block}
+.brandbar .name{font-family:'Marcellus',serif;font-size:17px;letter-spacing:.14em;text-transform:uppercase}
+.hero{ text-align:center;padding:10px 0 22px}
+.hero .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--honey);margin-bottom:10px}
+.hero h1{font-size:clamp(30px,7vw,40px);line-height:1.12;margin-bottom:10px}
+.hero p{color:var(--dim);max-width:46ch;margin:0 auto}
+
+/* Ticket / stay card */
+.ticket{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line);overflow:hidden;margin:8px 0 26px;animation:rise .5s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.ticket .top{padding:18px 22px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ticket .top .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.ticket .top .guest{font-family:'Marcellus',serif;font-size:22px}
+.ticket .dates{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:18px 22px;position:relative}
+.ticket .d .tag{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:4px}
+.ticket .d .day{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500}
+.ticket .d .sub{font-size:13px;color:var(--dim)}
+.ticket .d.right{text-align:right}
+.ticket .arrow{color:var(--honey);font-size:20px;padding:0 12px}
+.ticket .perf{position:relative;border-top:2px dashed var(--line);margin:0 14px}
+.ticket .perf::before,.ticket .perf::after{content:"";position:absolute;top:-9px;width:18px;height:18px;border-radius:50%;background:var(--paper);border:1px solid var(--line)}
+.ticket .perf::before{left:-24px}.ticket .perf::after{right:-24px}
+.ticket .foot{display:flex;justify-content:space-between;gap:10px;padding:14px 22px;font-size:13px;color:var(--dim)}
+.ticket .foot b{color:var(--ink);font-weight:600}
+
+/* Section nav */
+.nav{position:sticky;top:0;z-index:20;background:linear-gradient(var(--paper) 82%,transparent);padding:10px 0 12px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav a{flex:0 0 auto;text-decoration:none;font-size:13.5px;font-weight:600;color:var(--green);background:var(--card);border:1px solid var(--line);padding:8px 14px;border-radius:999px;white-space:nowrap}
+.nav a:active{background:var(--green-soft)}
+
+/* Sections */
+section{margin:30px 0}
+.sec-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.sec-head h2{font-size:24px}
+.sec-head .rule{flex:1;height:1px;background:var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:12px}
+.muted{color:var(--dim)}
+.small{font-size:13.5px}
+
+/* Steps */
+.step{display:flex;gap:14px;align-items:flex-start}
+.step + .step{margin-top:0}
+.step .n{flex:0 0 30px;height:30px;border-radius:50%;background:var(--green-soft);color:var(--green);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;margin-top:2px}
+.step h3{font-size:16.5px;font-family:'Figtree',sans-serif;font-weight:700;margin-bottom:2px}
+.step p{color:var(--dim);font-size:14.5px;white-space:pre-line}
+.step-photo{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line)}
+.video-wrap{position:relative;width:100%;aspect-ratio:16/9;margin-top:10px;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#000}
+.video-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.step-video{width:100%;border-radius:12px;margin-top:10px;background:#000}
+.cover{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--radius);border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:16px;display:block}
+.confirm-btn{margin-top:10px;border:1.5px solid var(--green);background:transparent;color:var(--green);font-weight:600;font-size:13.5px;padding:7px 14px;border-radius:999px;transition:all .15s}
+.confirm-btn.done{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* Wifi */
+.wifi{background:var(--ink);color:#F2EFE6;border:none}
+.wifi .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#A9B8AC;margin-bottom:3px}
+.wifi .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0}
+.wifi .row + .row{border-top:1px solid rgba(255,255,255,.14)}
+.wifi .val{font-family:'IBM Plex Mono',monospace;font-size:17px;word-break:break-all}
+.copy{border:1px solid rgba(255,255,255,.35);background:transparent;color:#F2EFE6;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600}
+
+/* Rules, tips, faq */
+.rule-item{display:flex;gap:12px;align-items:flex-start;padding:12px 0}
+.rule-item + .rule-item{border-top:1px solid var(--line)}
+.rule-item .dot{flex:0 0 8px;height:8px;border-radius:50%;background:var(--honey);margin-top:7px}
+.rule-item b{display:block}
+.rule-item p{color:var(--dim);font-size:14.5px;white-space:pre-line}
+.tip-cat{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--honey);margin:18px 0 8px}
+.tip{padding:12px 0}
+.tip + .tip{border-top:1px solid var(--line)}
+.tip b{display:block}
+.tip p{color:var(--dim);font-size:14.5px;white-space:pre-line}
+.tip a{font-size:13.5px;font-weight:600;text-decoration:none;display:inline-block;margin-top:4px}
+details{border-bottom:1px solid var(--line);padding:4px 0}
+summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;font-weight:600;cursor:pointer}
+summary::after{content:"+";font-family:'IBM Plex Mono',monospace;color:var(--honey);font-size:18px}
+details[open] summary::after{content:"–"}
+details p{color:var(--dim);font-size:14.5px;padding:0 0 14px;white-space:pre-line}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:12px;padding:13px 20px;font-size:15px;font-weight:700;text-decoration:none;transition:transform .12s}
+.btn:active{transform:scale(.98)}
+.btn-green{background:var(--green);color:#fff}
+.btn-honey{background:var(--honey);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--green);color:var(--green)}
+.btn-block{display:flex;width:100%}
+.done-banner{background:var(--green-soft);border:1px solid var(--green);color:var(--green);border-radius:12px;padding:14px 16px;font-weight:600;text-align:center}
+
+/* States */
+.state{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+.state h1{font-size:26px;margin:14px 0 8px}
+.state p{color:var(--dim);max-width:40ch}
+.spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--honey);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+footer{margin-top:44px;text-align:center;color:var(--dim);font-size:12.5px}
+footer .name{font-family:'Marcellus',serif;letter-spacing:.14em;text-transform:uppercase;color:var(--green)}
+</style>
+</head>
+<body>
+<div id="app"><div class="state"><div class="spinner"></div></div></div>
+
+<script>
+const CFG = window.VILASTAY_CONFIG;
+const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+const $app = document.getElementById('app');
+let D = null;   // dados do portal
+let TOKEN = new URLSearchParams(location.search).get('t') || '';
+
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const DIAS  = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+function parseDate(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
+function fmtDay(s){ const d = parseDate(s); return String(d.getDate()).padStart(2,'0') + ' ' + MESES[d.getMonth()]; }
+function fmtWeek(s){ return DIAS[parseDate(s).getDay()]; }
+function nights(a,b){ return Math.round((parseDate(b)-parseDate(a))/86400000); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function videoEmbed(url){
+  if(!url) return '';
+  const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{6,})/);
+  if(m) return `<div class="video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${m[1]}?rel=0" title="Vídeo do passo" allowfullscreen loading="lazy"></iframe></div>`;
+  if(/\.(mp4|webm|mov)(\?|$)/i.test(url)) return `<video class="step-video" src="${esc(url)}" controls preload="metadata" playsinline></video>`;
+  return `<a class="btn btn-outline btn-block" style="margin-top:10px" href="${esc(url)}" target="_blank" rel="noopener">▶ Assistir vídeo deste passo</a>`;
+}
+function waLink(phone, text){
+  let p = String(phone||'').replace(/\D/g,'');
+  if (p.length >= 10 && p.length <= 11) p = '55' + p;
+  return 'https://wa.me/' + p + '?text=' + encodeURIComponent(text);
+}
+
+function stateScreen(icon, title, msg){
+  $app.innerHTML = `<div class="state"><div style="font-size:44px">${icon}</div><h1 class="display">${title}</h1><p>${msg}</p></div>`;
+}
+
+async function load(){
+  if (!TOKEN) return stateScreen('🔑','Link incompleto','Este guia é acessado por um link exclusivo enviado pelo anfitrião. Verifique a mensagem que você recebeu.');
+  try{
+    const { data, error } = await sb.rpc('guest_portal', { p_token: TOKEN });
+    if (error) throw error;
+    if (data.error === 'not_found') return stateScreen('🔎','Reserva não encontrada','Este link não corresponde a nenhuma reserva. Confira com o anfitrião se o link está correto.');
+    if (data.error === 'expired') return stateScreen('🌙','Estadia encerrada','Este guia ficou disponível até 2 dias após o checkout. Esperamos que a estadia tenha sido ótima — volte sempre!');
+    D = data;
+    render();
+  }catch(e){
+    stateScreen('📡','Não foi possível carregar','Verifique sua conexão e recarregue a página.');
+  }
+}
+
+function render(){
+  const p = D.property, r = D.reservation;
+  const confirmed = new Set(D.confirmed_step_ids || []);
+  const n = nights(r.check_in, r.check_out);
+  const isCheckoutDay = (() => { const t = new Date(); t.setHours(0,0,0,0); return parseDate(r.check_out) <= t; })();
+
+  const stepHtml = (s, i) => `
+    <div class="card step" id="step-${s.id}">
+      <div class="n">${String(i+1).padStart(2,'0')}</div>
+      <div style="flex:1">
+        <h3>${esc(s.title)}</h3>
+        <p>${esc(s.description)}</p>
+        ${s.photo_url ? `<img class="step-photo" src="${esc(s.photo_url)}" alt="Foto: ${esc(s.title)}" loading="lazy">` : ''}
+        ${videoEmbed(s.video_url)}
+        ${s.requires_confirmation ? `<button class="confirm-btn ${confirmed.has(s.id)?'done':''}" data-step="${s.id}">${confirmed.has(s.id)?'✓ Confirmado':'Confirmar que fiz isso'}</button>` : ''}
+      </div>
+    </div>`;
+
+  const tipsByCat = {};
+  (D.tips||[]).forEach(t => { (tipsByCat[t.category] = tipsByCat[t.category] || []).push(t); });
+
+  $app.innerHTML = `
+  <div class="wrap">
+    <div class="brandbar"><span class="mark" aria-hidden="true"></span><span class="name">${esc(CFG.BRAND)}</span></div>
+
+    <div class="hero">
+      <div class="eyebrow">Guia da sua estadia</div>
+      <h1>${esc(p.name || 'Seu apartamento')}</h1>
+      <p>${esc(p.welcome_message || 'Tudo o que você precisa para a sua estadia está aqui: chegada, Wi-Fi, dicas da cidade e saída.')}</p>
+    </div>
+
+    ${p.cover_url ? `<img class="cover" src="${esc(p.cover_url)}" alt="Foto do imóvel">` : ''}
+    <div class="ticket" role="group" aria-label="Resumo da reserva">
+      <div class="top">
+        <div><div class="label">Hóspede</div><div class="guest">${esc(r.guest_name)}</div></div>
+        <div style="text-align:right"><div class="label">Noites</div><div class="mono" style="font-size:20px">${n}</div></div>
+      </div>
+      <div class="dates">
+        <div class="d"><div class="tag">Check-in</div><div class="day">${fmtDay(r.check_in)}</div><div class="sub">${fmtWeek(r.check_in)} · a partir das ${esc(p.check_in_time)}</div></div>
+        <div class="arrow">→</div>
+        <div class="d right"><div class="tag">Check-out</div><div class="day">${fmtDay(r.check_out)}</div><div class="sub">${fmtWeek(r.check_out)} · até ${esc(p.check_out_time)}</div></div>
+      </div>
+      <div class="perf" aria-hidden="true"></div>
+      <div class="foot"><span>Endereço</span><b style="text-align:right">${esc(p.address || '—')}</b></div>
+    </div>
+
+    <nav class="nav" aria-label="Seções do guia">
+      <a href="#chegada">Chegada</a>
+      <a href="#wifi">Wi-Fi</a>
+      ${(D.rules||[]).length ? '<a href="#regras">Regras</a>' : ''}
+      ${(D.tips||[]).length ? '<a href="#dicas">Dicas</a>' : ''}
+      ${(D.faq||[]).length ? '<a href="#faq">Dúvidas</a>' : ''}
+      <a href="#saida">Saída</a>
+    </nav>
+
+    <section id="chegada">
+      <div class="sec-head"><h2>Chegada</h2><div class="rule"></div></div>
+      ${p.maps_url ? `<a class="btn btn-outline btn-block" style="margin-bottom:12px" href="${esc(p.maps_url)}" target="_blank" rel="noopener">📍 Abrir endereço no Google Maps</a>` : ''}
+      ${(D.checkin_steps||[]).length ? D.checkin_steps.map(stepHtml).join('') : '<div class="card muted">O anfitrião ainda não cadastrou o passo a passo de chegada.</div>'}
+    </section>
+
+    <section id="wifi">
+      <div class="sec-head"><h2>Wi-Fi</h2><div class="rule"></div></div>
+      <div class="card wifi">
+        <div class="row"><div><div class="label">Rede</div><div class="val">${esc(p.wifi_name || '—')}</div></div><button class="copy" data-copy="${esc(p.wifi_name)}">Copiar</button></div>
+        <div class="row"><div><div class="label">Senha</div><div class="val">${esc(p.wifi_password || '—')}</div></div><button class="copy" data-copy="${esc(p.wifi_password)}">Copiar</button></div>
+      </div>
+    </section>
+
+    ${(D.rules||[]).length ? `
+    <section id="regras">
+      <div class="sec-head"><h2>Regras da casa</h2><div class="rule"></div></div>
+      <div class="card">${D.rules.map(x => `<div class="rule-item"><div class="dot"></div><div><b>${esc(x.title)}</b><p>${esc(x.description)}</p></div></div>`).join('')}</div>
+    </section>` : ''}
+
+    ${(D.tips||[]).length ? `
+    <section id="dicas">
+      <div class="sec-head"><h2>Dicas do anfitrião</h2><div class="rule"></div></div>
+      <div class="card">${Object.entries(tipsByCat).map(([cat, arr]) => `
+        <div class="tip-cat">${esc(cat)}</div>
+        ${arr.map(t => `<div class="tip"><b>${esc(t.title)}</b><p>${esc(t.description)}</p>${t.maps_url ? `<a href="${esc(t.maps_url)}" target="_blank" rel="noopener">Ver no mapa →</a>` : ''}</div>`).join('')}
+      `).join('')}</div>
+    </section>` : ''}
+
+    ${(D.faq||[]).length ? `
+    <section id="faq">
+      <div class="sec-head"><h2>Dúvidas frequentes</h2><div class="rule"></div></div>
+      <div class="card">${D.faq.map(f => `<details><summary>${esc(f.question)}</summary><p>${esc(f.answer)}</p></details>`).join('')}</div>
+    </section>` : ''}
+
+    <section id="saida">
+      <div class="sec-head"><h2>Saída</h2><div class="rule"></div></div>
+      ${p.checkout_notes ? `<div class="card small muted" style="white-space:pre-line">${esc(p.checkout_notes)}</div>` : ''}
+      ${(D.checkout_steps||[]).map(stepHtml).join('')}
+      <div style="margin-top:14px">
+        ${D.checkout_done
+          ? `<div class="done-banner">✓ Saída confirmada. Obrigado pela estadia!</div>`
+          : `<button class="btn btn-green btn-block" id="btn-checkout">🏠 Concluí a saída — avisar o anfitrião</button>
+             <p class="small muted" style="text-align:center;margin-top:8px">Toque quando já tiver saído do apartamento.</p>`}
+        ${(isCheckoutDay || D.checkout_done) && p.review_url ? `<a class="btn btn-honey btn-block" style="margin-top:12px" href="${esc(p.review_url)}" target="_blank" rel="noopener">⭐ Avaliar a estadia</a>` : ''}
+      </div>
+    </section>
+
+    ${p.contact_phone ? `
+    <section id="contato">
+      <div class="card" style="text-align:center">
+        <b>Precisa de algo durante a estadia?</b>
+        <p class="small muted" style="margin:4px 0 14px">Fale direto com o anfitrião.</p>
+        <a class="btn btn-outline btn-block" href="${waLink(p.contact_phone, 'Olá! Estou hospedado no ' + (p.name||'apartamento') + ' e preciso de uma ajuda.')}" target="_blank" rel="noopener">💬 Chamar no WhatsApp</a>
+      </div>
+    </section>` : ''}
+
+    <footer>Guia preparado com carinho pelo seu anfitrião<br><span class="name">${esc(CFG.BRAND)}</span></footer>
+  </div>`;
+
+  bind();
+}
+
+function bind(){
+  document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', () => {
+    navigator.clipboard.writeText(b.dataset.copy || '');
+    const old = b.textContent; b.textContent = 'Copiado ✓';
+    setTimeout(() => b.textContent = old, 1600);
+  }));
+
+  document.querySelectorAll('.confirm-btn').forEach(b => b.addEventListener('click', async () => {
+    if (b.classList.contains('done')) return;
+    b.disabled = true;
+    const { data } = await sb.rpc('guest_confirm_step', { p_token: TOKEN, p_step_id: b.dataset.step });
+    b.disabled = false;
+    if (data && data.ok){ b.classList.add('done'); b.textContent = '✓ Confirmado'; }
+  }));
+
+  const co = document.getElementById('btn-checkout');
+  if (co) co.addEventListener('click', async () => {
+    if (!confirm('Confirmar que você já concluiu a saída do apartamento?')) return;
+    co.disabled = true; co.textContent = 'Enviando…';
+    const { data } = await sb.rpc('guest_complete_checkout', { p_token: TOKEN });
+    if (data && data.ok){ D.checkout_done = true; render(); window.scrollTo({ top: document.getElementById('saida').offsetTop - 60 }); }
+    else { co.disabled = false; co.textContent = '🏠 Concluí a saída — avisar o anfitrião'; }
+  });
+}
+
+if (!CFG || CFG.SUPABASE_URL.startsWith('COLE_AQUI')){
+  stateScreen('⚙️','Configuração pendente','O arquivo config.js ainda não foi preenchido com os dados do Supabase.');
+} else {
+  load();
+}
+</script>
+</body>
+</html>

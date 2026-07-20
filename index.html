@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F1D17">
+<link rel="apple-touch-icon" href="icon-512.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vila Stay — Painel do anfitrião</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --bg:#0F1D17; --panel:#16261F; --panel2:#1D3128;
+  --line:#273D32; --text:#EDEAE0; --dim:#93A79A; --honey:#D69A3A; --honey-dim:#8A6320;
+  --ok:#6FBF8F; --danger:#E06C5C; --blue:#7FB4D9; --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Figtree',sans-serif;font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.display{font-family:'Marcellus',serif;font-weight:400}
+.mono{font-family:'IBM Plex Mono',monospace}
+button{font-family:inherit;cursor:pointer;color:inherit}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--honey)}
+textarea{resize:vertical;min-height:80px}
+label{display:block;font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:14px 0 6px}
+:focus-visible{outline:2px solid var(--honey);outline-offset:2px}
+a{color:var(--honey)}
+
+/* Shell */
+.topbar{position:sticky;top:0;z-index:30;background:rgba(15,29,23,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:12px 16px}
+.topbar .brand{display:flex;align-items:center;gap:8px;color:var(--honey)}
+.topbar .mark{width:18px;height:18px;border:1.5px solid var(--honey);border-radius:50% 50% 50% 3px}
+.topbar .name{font-family:'Marcellus',serif;font-size:14px;letter-spacing:.16em;text-transform:uppercase}
+.topbar select{width:auto;max-width:46vw;margin-left:auto;padding:8px 10px;font-size:14px;background:var(--panel)}
+.topbar .out{background:none;border:none;color:var(--dim);font-size:18px;padding:4px}
+main{max-width:760px;margin:0 auto;padding:18px 16px 96px}
+
+/* Bottom nav */
+.tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--panel);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.tabs button{flex:1;background:none;border:none;color:var(--dim);font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:10px}
+.tabs button .ico{font-size:19px}
+.tabs button.on{color:var(--honey)}
+
+/* Cards & layout */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.sec-title{display:flex;align-items:center;gap:10px;margin:20px 0 12px}
+.sec-title h2{font-size:20px}
+.sec-title .rule{flex:1;height:1px;background:var(--line)}
+.muted{color:var(--dim)}.small{font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;text-align:center}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:26px;color:var(--honey)}
+.stat .l{font-size:11.5px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+
+/* Arrivals board */
+.board .day{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.board .day:last-child{border-bottom:none}
+.board .when{flex:0 0 64px}
+.board .when .dow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.board .when .num{font-family:'IBM Plex Mono',monospace;font-size:20px}
+.board .when.today .num,.board .when.today .dow{color:var(--honey)}
+.board .events{flex:1;display:flex;flex-direction:column;gap:6px}
+.ev{display:flex;align-items:center;gap:8px;font-size:14px;flex-wrap:wrap}
+.chip{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.08em;padding:3px 8px;border-radius:6px}
+.chip.in{background:rgba(111,191,143,.15);color:var(--ok);border:1px solid rgba(111,191,143,.4)}
+.chip.out{background:rgba(224,108,92,.13);color:var(--danger);border:1px solid rgba(224,108,92,.4)}
+.chip.stay{background:rgba(127,180,217,.12);color:var(--blue);border:1px solid rgba(127,180,217,.35)}
+.ev .prop-tag{font-size:12px;color:var(--dim)}
+.empty-day{color:var(--dim);font-size:13.5px;font-style:italic}
+
+/* Notifications */
+.notif{display:flex;align-items:center;gap:12px;background:rgba(214,154,58,.09);border:1px solid rgba(214,154,58,.45);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px}
+.notif .txt{flex:1;font-size:14px}
+.notif .txt b{display:block}
+.notif .x{background:none;border:none;color:var(--dim);font-size:18px;padding:4px}
+
+/* Reservation list */
+.resv{display:flex;flex-direction:column;gap:4px}
+.resv .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.resv .head b{font-size:16px}
+.pill{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 9px;border-radius:999px;white-space:nowrap}
+.pill.now{background:rgba(111,191,143,.15);color:var(--ok)}
+.pill.soon{background:rgba(214,154,58,.15);color:var(--honey)}
+.pill.future{background:rgba(127,180,217,.12);color:var(--blue)}
+.pill.past{background:var(--panel2);color:var(--dim)}
+.resv .dates{font-family:'IBM Plex Mono',monospace;font-size:13.5px;color:var(--dim)}
+.resv .src{font-size:11.5px;color:var(--dim)}
+.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.abtn{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:13px;font-weight:600}
+.abtn.warn{color:var(--danger)}
+
+/* Items (guide) */
+.item{display:flex;gap:10px;align-items:flex-start}
+.item .txt{flex:1}
+.item .txt b{display:block}
+.item .txt p{color:var(--dim);font-size:13.5px;white-space:pre-line}
+.item .ops{display:flex;gap:4px}
+.iop{background:var(--panel2);border:1px solid var(--line);border-radius:8px;width:32px;height:32px;font-size:14px;display:flex;align-items:center;justify-content:center}
+.subtabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;scrollbar-width:none}
+.subtabs::-webkit-scrollbar{display:none}
+.subtabs button{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:600}
+.subtabs button.on{color:var(--bg);background:var(--honey);border-color:var(--honey)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:11px;padding:12px 18px;font-size:15px;font-weight:700;text-decoration:none}
+.btn:active{transform:scale(.98)}
+.btn-honey{background:var(--honey);color:#14231C}
+.btn-outline{background:transparent;border:1.5px solid var(--honey);color:var(--honey)}
+.btn-danger{background:transparent;border:1.5px solid var(--danger);color:var(--danger)}
+.btn-block{display:flex;width:100%}
+.fab-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+
+/* Modal */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(6,12,9,.7);display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:560px){.overlay{align-items:center}}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;padding:20px 18px 26px}
+@media(min-width:560px){.modal{border-radius:18px}}
+.modal h3{font-size:19px;margin-bottom:4px}
+.modal .close-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.modal .x{background:none;border:none;color:var(--dim);font-size:22px}
+.qr-wrap{display:flex;justify-content:center;padding:14px;background:#fff;border-radius:12px;margin:12px 0}
+.linkbox{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;word-break:break-all;margin:10px 0}
+.check-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+.check-row input{width:auto}
+.check-row span{font-size:14px;color:var(--dim)}
+
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login .box{width:100%;max-width:380px}
+.login .brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:26px;color:var(--honey)}
+.login .mark{width:34px;height:34px;border:2px solid var(--honey);border-radius:50% 50% 50% 5px}
+.login .name{font-family:'Marcellus',serif;font-size:20px;letter-spacing:.18em;text-transform:uppercase}
+.login .sub{color:var(--dim);font-size:13.5px}
+.err{color:var(--danger);font-size:13.5px;margin-top:10px;min-height:18px}
+.toast{position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:60;background:var(--honey);color:#14231C;font-weight:700;font-size:14px;padding:10px 18px;border-radius:999px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.spinner{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--honey);border-radius:50%;animation:spin .8s linear infinite;margin:60px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.setup{max-width:560px;margin:40px auto;padding:0 18px}
+.setup ol{margin:14px 0 0 20px;display:flex;flex-direction:column;gap:10px;color:var(--dim)}
+.setup code{font-family:'IBM Plex Mono',monospace;background:var(--panel2);padding:2px 6px;border-radius:6px;font-size:13px;color:var(--text)}
+</style>
+</head>
+<body>
+<div id="app"><div class="spinner"></div></div>
+<div class="toast" id="toast"></div>
+<script>
+/* ================= VILA STAY — Painel do anfitrião ================= */
+const CFG = window.VILASTAY_CONFIG;
+const $app = document.getElementById('app');
+const $toast = document.getElementById('toast');
+let sb = null;
+const S = { session:null, props:[], propId:null, view:'dash', subtab:'checkin', cache:{} };
+
+const MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const DOW=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+const KINDS_MSG=[
+  {kind:'boas_vindas', label:'Boas-vindas + link do guia', body:'Olá, {nome}! 👋 Sua reserva no {imovel} está confirmada: {checkin} a {checkout}.\n\nPreparei um guia completo da estadia, com endereço, passo a passo da chegada, Wi-Fi e dicas da cidade:\n{link}\n\nQualquer coisa, é só me chamar por aqui. Boa viagem! 🏠'},
+  {kind:'vespera', label:'Véspera do check-in', body:'Olá, {nome}! Amanhã é o dia do seu check-in no {imovel} 🎉\nA entrada é a partir das {hora_checkin}.\n\nO passo a passo da chegada está no seu guia:\n{link}\n\nBoa viagem!'},
+  {kind:'dia_checkout', label:'Dia do check-out', body:'Bom dia, {nome}! Hoje é o dia do seu check-out, até as {hora_checkout}.\n\nO passo a passo da saída está no guia:\n{link}\n\nFoi um prazer receber você! 🙌'},
+  {kind:'avaliacao', label:'Pedido de avaliação', body:'Olá, {nome}! Espero que a estadia no {imovel} tenha sido ótima 😊\n\nSua avaliação faz toda a diferença para o meu trabalho como anfitrião:\n{reviewlink}\n\nMuito obrigado e até a próxima!'}
+];
+
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(m){$toast.textContent=m;$toast.classList.add('show');setTimeout(()=>$toast.classList.remove('show'),2000)}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function addDays(s,n){const[y,m,d]=s.split('-').map(Number);const dt=new Date(y,m-1,d+n);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')}
+function fmtBR(s){if(!s)return'—';const[y,m,d]=s.split('-');return d+'/'+m}
+function fmtBRfull(s){if(!s)return'—';const[y,m,d]=s.split('-');return d+'/'+m+'/'+y}
+function prop(){return S.props.find(p=>p.id===S.propId)}
+function guestUrl(token){const base=location.origin+location.pathname.replace(/[^/]*$/,'');return base+'guest.html?t='+token}
+function waLink(phone,text){let p=String(phone||'').replace(/\D/g,'');if(p.length>=10&&p.length<=11)p='55'+p;return 'https://wa.me/'+p+'?text='+encodeURIComponent(text)}
+function fillVars(body,r,p){
+  return body
+    .replaceAll('{nome}',(r.guest_name||'').split(' ')[0])
+    .replaceAll('{imovel}',p.name||'apartamento')
+    .replaceAll('{link}',guestUrl(r.token))
+    .replaceAll('{checkin}',fmtBRfull(r.check_in))
+    .replaceAll('{checkout}',fmtBRfull(r.check_out))
+    .replaceAll('{hora_checkin}',p.check_in_time||'15:00')
+    .replaceAll('{hora_checkout}',p.check_out_time||'11:00')
+    .replaceAll('{wifi}',p.wifi_name||'')
+    .replaceAll('{senha_wifi}',p.wifi_password||'')
+    .replaceAll('{reviewlink}',p.review_url||'');
+}
+
+/* ---------- Fotos: comprime (~1280px JPEG) e envia ao Storage ---------- */
+async function compressUpload(file, path){
+  const img = await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file)});
+  const max=1280;let w=img.width,h=img.height;
+  if(Math.max(w,h)>max){const k=max/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  c.getContext('2d').drawImage(img,0,0,w,h);
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.8));
+  const {error}=await sb.storage.from('fotos').upload(path,blob,{upsert:true,contentType:'image/jpeg'});
+  if(error)throw error;
+  return sb.storage.from('fotos').getPublicUrl(path).data.publicUrl;
+}
+
+/* ---------- Modal helper ---------- */
+function openModal(html){
+  closeModal();
+  const ov=document.createElement('div');ov.className='overlay';ov.id='ov';
+  ov.innerHTML=`<div class="modal">${html}</div>`;
+  ov.addEventListener('click',e=>{if(e.target===ov)closeModal()});
+  document.body.appendChild(ov);
+  const x=ov.querySelector('.x');if(x)x.addEventListener('click',closeModal);
+  return ov;
+}
+function closeModal(){const o=document.getElementById('ov');if(o)o.remove()}
+
+/* ---------- Boot ---------- */
+async function boot(){
+  if(!CFG||CFG.SUPABASE_URL.startsWith('COLE_AQUI')){
+    $app.innerHTML=`<div class="setup"><h2 class="display" style="font-size:24px">Configuração pendente</h2>
+    <ol>
+      <li>Crie um projeto gratuito em <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a></li>
+      <li>No SQL Editor, cole e rode o arquivo <code>setup.sql</code></li>
+      <li>Em Authentication → Users, crie seu usuário admin (e-mail + senha)</li>
+      <li>Em Settings → API, copie a <code>Project URL</code> e a chave <code>anon public</code></li>
+      <li>Cole as duas no arquivo <code>config.js</code> do repositório e salve</li>
+    </ol></div>`;
+    return;
+  }
+  sb=supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY);
+  const {data:{session}}=await sb.auth.getSession();
+  S.session=session;
+  sb.auth.onAuthStateChange((_e,s)=>{S.session=s;s?start():renderLogin()});
+  S.session?start():renderLogin();
+}
+
+function renderLogin(){
+  $app.innerHTML=`<div class="login"><div class="box">
+    <div class="brand"><span class="mark"></span><span class="name">${esc(CFG.BRAND)}</span><span class="sub">Painel do anfitrião</span></div>
+    <label>E-mail</label><input id="li-email" type="email" autocomplete="username">
+    <label>Senha</label><input id="li-pass" type="password" autocomplete="current-password">
+    <div class="err" id="li-err"></div>
+    <button class="btn btn-honey btn-block" id="li-go">Entrar</button>
+    <button class="btn btn-outline btn-block" id="li-signup" style="margin-top:10px">Criar minha conta</button>
+    <p class="small muted" style="text-align:center;margin-top:12px">Novo por aqui? Crie sua conta e gerencie seus próprios imóveis — cada anfitrião só vê os seus.</p>
+  </div></div>`;
+  const go=async()=>{
+    const email=document.getElementById('li-email').value.trim();
+    const pass=document.getElementById('li-pass').value;
+    document.getElementById('li-err').textContent='';
+    const {error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error)document.getElementById('li-err').textContent='E-mail ou senha incorretos.';
+  };
+  document.getElementById('li-go').addEventListener('click',go);
+  document.getElementById('li-signup').addEventListener('click',async()=>{
+    const email=document.getElementById('li-email').value.trim();
+    const pass=document.getElementById('li-pass').value;
+    const $err=document.getElementById('li-err');$err.textContent='';
+    if(!email||pass.length<6){$err.textContent='Informe e-mail e uma senha com 6+ caracteres.';return}
+    const {data,error}=await sb.auth.signUp({email,password:pass});
+    if(error){$err.textContent='Não foi possível criar a conta: '+error.message;return}
+    if(data.session)toast('Conta criada! Bem-vindo(a)');
+    else $err.textContent='Conta criada. Confirme pelo link enviado ao seu e-mail para entrar.';
+  });
+  document.getElementById('li-pass').addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+}
+
+async function start(){
+  $app.innerHTML='<div class="spinner"></div>';
+  const {data,error}=await sb.from('properties').select('*').order('created_at');
+  if(error){$app.innerHTML='<div class="setup">Erro ao carregar. Confira se o setup.sql foi executado no Supabase.</div>';return}
+  S.props=data||[];
+  if(!S.props.length){await createFirstProperty();return}
+  const saved=localStorage.getItem('vs_prop');
+  S.propId=S.props.some(p=>p.id===saved)?saved:S.props[0].id;
+  render();
+}
+
+async function createFirstProperty(){
+  const {data}=await sb.from('properties').insert({name:'Meu apartamento'}).select().single();
+  if(data){S.props=[data];S.propId=data.id;S.view='prop';render();toast('Comece cadastrando o imóvel')}
+}
+
+/* ---------- Shell ---------- */
+function render(){
+  const tabs=[['dash','⌂','Painel'],['resv','⇄','Reservas'],['guide','☰','Guia'],['msgs','✉','Mensagens'],['prop','⚙','Imóvel']];
+  $app.innerHTML=`
+  <div class="topbar">
+    <div class="brand"><span class="mark"></span><span class="name">${esc(CFG.BRAND)}</span></div>
+    <select id="prop-sel" aria-label="Imóvel">${S.props.map(p=>`<option value="${p.id}" ${p.id===S.propId?'selected':''}>${esc(p.name||'Sem nome')}</option>`).join('')}</select>
+    <button class="out" id="logout" title="Sair">⎋</button>
+  </div>
+  <main id="view"><div class="spinner"></div></main>
+  <nav class="tabs">${tabs.map(([k,i,l])=>`<button data-v="${k}" class="${S.view===k?'on':''}"><span class="ico">${i}</span>${l}</button>`).join('')}</nav>`;
+  document.getElementById('prop-sel').addEventListener('change',e=>{S.propId=e.target.value;localStorage.setItem('vs_prop',S.propId);render()});
+  document.getElementById('logout').addEventListener('click',()=>sb.auth.signOut());
+  document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{S.view=b.dataset.v;render()}));
+  ({dash:viewDash,resv:viewResv,guide:viewGuide,msgs:viewMsgs,prop:viewProp})[S.view]();
+}
+const $view=()=>document.getElementById('view');
+
+/* ---------- Dashboard ---------- */
+async function viewDash(){
+  const today=todayStr(),end=addDays(today,7);
+  const [rv,nt]=await Promise.all([
+    sb.from('reservations').select('*').lte('check_in',end).gte('check_out',today),
+    sb.from('notifications').select('*, reservations(guest_name,check_out,property_id)').eq('dismissed',false).order('created_at',{ascending:false})
+  ]);
+  const res=rv.data||[],notifs=nt.data||[];
+  const pname=id=>{const p=S.props.find(x=>x.id===id);return p?p.name:''};
+  const staying=res.filter(r=>r.check_in<=today&&r.check_out>today);
+  const arr7=res.filter(r=>r.check_in>=today&&r.check_in<=end);
+  const dep7=res.filter(r=>r.check_out>=today&&r.check_out<=end);
+
+  let board='';
+  for(let i=0;i<=7;i++){
+    const d=addDays(today,i);const[y,m,dd]=d.split('-').map(Number);
+    const dow=DOW[new Date(y,m-1,dd).getDay()];
+    const ins=res.filter(r=>r.check_in===d),outs=res.filter(r=>r.check_out===d);
+    const evs=[
+      ...outs.map(r=>`<div class="ev"><span class="chip out">OUT ${esc((prop()&&S.props.find(p=>p.id===r.property_id))?S.props.find(p=>p.id===r.property_id).check_out_time:'')}</span> ${esc(r.guest_name)} <span class="prop-tag">· ${esc(pname(r.property_id))}</span></div>`),
+      ...ins.map(r=>`<div class="ev"><span class="chip in">IN ${esc((S.props.find(p=>p.id===r.property_id)||{}).check_in_time||'')}</span> ${esc(r.guest_name)} <span class="prop-tag">· ${esc(pname(r.property_id))}</span></div>`)
+    ];
+    board+=`<div class="day"><div class="when ${i===0?'today':''}"><div class="dow">${i===0?'HOJE':dow}</div><div class="num">${String(dd).padStart(2,'0')}/${String(m).padStart(2,'0')}</div></div>
+    <div class="events">${evs.length?evs.join(''):'<div class="empty-day">sem movimentação</div>'}</div></div>`;
+  }
+
+  $view().innerHTML=`
+    ${notifs.map(n=>`<div class="notif"><div style="font-size:20px">🔔</div><div class="txt"><b>Apartamento entregue</b>${esc(n.reservations?.guest_name||'Hóspede')} concluiu o checkout · ${esc(pname(n.reservations?.property_id))}</div><button class="x" data-dismiss="${n.id}" title="Dispensar">✕</button></div>`).join('')}
+    <div class="stats">
+      <div class="stat"><div class="v">${staying.length}</div><div class="l">Hospedados</div></div>
+      <div class="stat"><div class="v">${arr7.length}</div><div class="l">Chegadas 7d</div></div>
+      <div class="stat"><div class="v">${dep7.length}</div><div class="l">Saídas 7d</div></div>
+    </div>
+    <div class="sec-title"><h2>Quadro dos próximos 7 dias</h2><div class="rule"></div></div>
+    <div class="card board">${board}</div>
+    <p class="small muted" style="text-align:center">O quadro mostra todos os imóveis. As demais abas seguem o imóvel selecionado no topo.</p>`;
+  document.querySelectorAll('[data-dismiss]').forEach(b=>b.addEventListener('click',async()=>{
+    await sb.from('notifications').update({dismissed:true}).eq('id',b.dataset.dismiss);
+    b.closest('.notif').remove();
+  }));
+}
+
+/* ---------- Reservas ---------- */
+async function viewResv(){
+  const p=prop();
+  const {data}=await sb.from('reservations').select('*').eq('property_id',S.propId).order('check_in',{ascending:false});
+  const res=data||[],today=todayStr();
+  const status=r=>{
+    if(r.check_in<=today&&r.check_out>today)return['now','Em estadia'];
+    if(r.check_in>today){const d=Math.round((new Date(r.check_in)-new Date(today))/864e5);return d<=3?['soon','Chega em '+d+'d']:['future','Futura']}
+    return['past','Encerrada'];
+  };
+  $view().innerHTML=`
+    <div class="fab-row">
+      <button class="btn btn-honey" id="new-r">+ Nova reserva</button>
+      ${p&&p.ical_url?'<button class="btn btn-outline" id="sync-ical">⟳ Sincronizar Airbnb</button>':''}
+    </div>
+    ${!p||!p.ical_url?'<p class="small muted" style="margin:-6px 0 12px">Dica: cadastre a URL do calendário iCal do Airbnb na aba Imóvel para importar reservas automaticamente.</p>':''}
+    ${res.length?res.map(r=>{const[cls,lbl]=status(r);return `
+      <div class="card resv">
+        <div class="head"><b>${esc(r.guest_name)}</b><span class="pill ${cls}">${lbl}</span></div>
+        <div class="dates">${fmtBRfull(r.check_in)} → ${fmtBRfull(r.check_out)}</div>
+        <div class="src">${r.source==='ical'?'Importada do Airbnb':'Cadastro manual'}${r.phone?' · '+esc(r.phone):''}</div>
+        <div class="actions">
+          <button class="abtn" data-link="${r.id}">🔗 Link do guia</button>
+          <button class="abtn" data-msg="${r.id}">💬 Mensagens</button>
+          <button class="abtn" data-edit="${r.id}">✎ Editar</button>
+          <button class="abtn warn" data-del="${r.id}">Excluir</button>
+        </div>
+      </div>`}).join(''):`<div class="card muted" style="text-align:center;padding:30px">Nenhuma reserva ainda.<br>Crie a primeira ou sincronize com o Airbnb.</div>`}`;
+  document.getElementById('new-r').addEventListener('click',()=>resvForm(null));
+  const sy=document.getElementById('sync-ical');if(sy)sy.addEventListener('click',()=>syncIcal(sy));
+  $view().querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>resvForm(res.find(r=>r.id===b.dataset.edit))));
+  $view().querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{
+    if(!confirm('Excluir esta reserva? O link do hóspede deixará de funcionar.'))return;
+    await sb.from('reservations').delete().eq('id',b.dataset.del);toast('Reserva excluída');viewResv();
+  }));
+  $view().querySelectorAll('[data-link]').forEach(b=>b.addEventListener('click',()=>linkModal(res.find(r=>r.id===b.dataset.link))));
+  $view().querySelectorAll('[data-msg]').forEach(b=>b.addEventListener('click',()=>msgModal(res.find(r=>r.id===b.dataset.msg))));
+}
+
+function resvForm(r){
+  openModal(`
+    <div class="close-row"><h3>${r?'Editar reserva':'Nova reserva'}</h3><button class="x">✕</button></div>
+    <label>Nome do hóspede</label><input id="f-name" value="${esc(r?.guest_name||'')}">
+    <label>WhatsApp (com DDD)</label><input id="f-phone" inputmode="tel" placeholder="34 99999-9999" value="${esc(r?.phone||'')}">
+    <div class="grid2">
+      <div><label>Check-in</label><input id="f-in" type="date" value="${r?.check_in||''}"></div>
+      <div><label>Check-out</label><input id="f-out" type="date" value="${r?.check_out||''}"></div>
+    </div>
+    <label>Observações</label><textarea id="f-notes">${esc(r?.notes||'')}</textarea>
+    <button class="btn btn-honey btn-block" id="f-save" style="margin-top:18px">Salvar reserva</button>`);
+  document.getElementById('f-save').addEventListener('click',async()=>{
+    const row={property_id:S.propId,guest_name:document.getElementById('f-name').value.trim(),
+      phone:document.getElementById('f-phone').value.trim()||null,
+      check_in:document.getElementById('f-in').value,check_out:document.getElementById('f-out').value,
+      notes:document.getElementById('f-notes').value.trim()||null};
+    if(!row.guest_name||!row.check_in||!row.check_out)return toast('Preencha nome e datas');
+    if(row.check_out<=row.check_in)return toast('Check-out deve ser após o check-in');
+    const q=r?sb.from('reservations').update(row).eq('id',r.id):sb.from('reservations').insert(row);
+    const {error}=await q;
+    if(error)return toast('Erro ao salvar');
+    closeModal();toast('Reserva salva');viewResv();
+  });
+}
+
+function linkModal(r){
+  const url=guestUrl(r.token);
+  openModal(`
+    <div class="close-row"><h3>Link do guia — ${esc(r.guest_name.split(' ')[0])}</h3><button class="x">✕</button></div>
+    <p class="small muted">Link exclusivo desta reserva. Expira 2 dias após o checkout.</p>
+    <div class="qr-wrap"><canvas id="qr"></canvas></div>
+    <div class="linkbox">${esc(url)}</div>
+    <div class="fab-row">
+      <button class="btn btn-outline" id="cp">Copiar link</button>
+      <a class="btn btn-outline" href="${esc(url)}" target="_blank" rel="noopener">Abrir</a>
+      ${r.phone?`<a class="btn btn-honey" target="_blank" rel="noopener" href="${waLink(r.phone,fillVars(KINDS_MSG[0].body,r,prop()))}">Enviar no WhatsApp</a>`:''}
+    </div>
+    ${!r.phone?'<p class="small muted">Cadastre o WhatsApp do hóspede na reserva para enviar direto.</p>':''}`);
+  QRCode.toCanvas(document.getElementById('qr'),url,{width:190,margin:1});
+  document.getElementById('cp').addEventListener('click',()=>{navigator.clipboard.writeText(url);toast('Link copiado')});
+}
+
+async function msgModal(r){
+  const p=prop();
+  const {data}=await sb.from('message_templates').select('*').eq('property_id',S.propId);
+  const tpl=k=>{const t=(data||[]).find(x=>x.kind===k);return t?t.body:KINDS_MSG.find(x=>x.kind===k).body};
+  openModal(`
+    <div class="close-row"><h3>Mensagens — ${esc(r.guest_name.split(' ')[0])}</h3><button class="x">✕</button></div>
+    <p class="small muted">Toque para abrir o WhatsApp com a mensagem pronta.${r.phone?'':' Sem WhatsApp cadastrado: a mensagem será copiada.'}</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+      ${KINDS_MSG.map(k=>`<button class="btn btn-outline btn-block" data-k="${k.kind}">${k.label}</button>`).join('')}
+    </div>`);
+  document.querySelectorAll('[data-k]').forEach(b=>b.addEventListener('click',()=>{
+    const body=fillVars(tpl(b.dataset.k),r,p);
+    if(r.phone)window.open(waLink(r.phone,body),'_blank');
+    else{navigator.clipboard.writeText(body);toast('Mensagem copiada')}
+  }));
+}
+
+/* ---------- iCal Airbnb ---------- */
+async function syncIcal(btn){
+  const p=prop();if(!p.ical_url)return;
+  btn.disabled=true;btn.textContent='Sincronizando…';
+  // 1) Tenta a Edge Function (servidor — confiável, sincroniza todos os imóveis)
+  try{
+    const {data,error}=await sb.functions.invoke('ical-sync',{body:{}});
+    if(error)throw error;
+    const mine=(data.report||[]).find(x=>x.imovel===p.name)||{};
+    if(mine.erro)throw new Error(mine.erro);
+    const n=mine.novas||0,c=mine.canceladas||0;
+    toast(n||c?`${n} nova(s)${c?`, ${c} cancelada(s)`:''}`:'Nenhuma reserva nova');
+    viewResv();return;
+  }catch(e){/* função não instalada ou falhou — usa o plano B abaixo */}
+  // 2) Plano B: busca direto pelo navegador via proxy público
+  try{
+    const res=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(p.ical_url));
+    if(!res.ok)throw 0;
+    const text=await res.text();
+    const events=[];const blocks=text.split('BEGIN:VEVENT').slice(1);
+    for(const b of blocks){
+      const g=re=>{const m=b.match(re);return m?m[1].trim():null};
+      const uid=g(/UID:(.+)/),sum=(g(/SUMMARY:(.+)/)||'');
+      const ds=g(/DTSTART(?:;VALUE=DATE)?:(\d{8})/),de=g(/DTEND(?:;VALUE=DATE)?:(\d{8})/);
+      if(!uid||!ds||!de)continue;
+      if(/not available|blocked|unavailable/i.test(sum))continue;
+      const f=s=>s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8);
+      events.push({uid,check_in:f(ds),check_out:f(de)});
+    }
+    const {data:existing}=await sb.from('reservations').select('ical_uid').eq('property_id',S.propId).not('ical_uid','is',null);
+    const have=new Set((existing||[]).map(x=>x.ical_uid));
+    const news=events.filter(e=>!have.has(e.uid)&&e.check_out>=todayStr());
+    if(news.length){
+      await sb.from('reservations').insert(news.map(e=>({property_id:S.propId,guest_name:'Hóspede Airbnb',check_in:e.check_in,check_out:e.check_out,source:'ical',ical_uid:e.uid})));
+    }
+    toast(news.length?news.length+' reserva(s) importada(s)':'Nenhuma reserva nova');
+    viewResv();
+  }catch(e){
+    btn.disabled=false;btn.textContent='⟳ Sincronizar Airbnb';
+    toast('Falha ao acessar o calendário. Tente de novo.');
+  }
+}
+
+/* ---------- Guia (conteúdo do portal) ---------- */
+async function viewGuide(){
+  const tabs=[['checkin','Chegada'],['checkout','Saída'],['rules','Regras'],['tips','Dicas'],['faq','FAQ']];
+  const t=S.subtab;
+  let items=[];
+  if(t==='checkin'||t==='checkout'){const {data}=await sb.from('steps').select('*').eq('property_id',S.propId).eq('kind',t).order('ord');items=data||[]}
+  else if(t==='rules'){const {data}=await sb.from('rules').select('*').eq('property_id',S.propId).order('ord');items=data||[]}
+  else if(t==='tips'){const {data}=await sb.from('tips').select('*').eq('property_id',S.propId).order('category');items=data||[]}
+  else {const {data}=await sb.from('faq_items').select('*').eq('property_id',S.propId).order('ord');items=data||[]}
+
+  const row=(it,i)=>{
+    const title=it.title||it.question, desc=it.description||it.answer||'';
+    const meta=t==='tips'?`<span class="small muted">${esc(it.category)}</span>`:(it.requires_confirmation?'<span class="small" style="color:var(--honey)">exige confirmação do hóspede</span>':'');
+    const canOrder=(t!=='tips');
+    return `<div class="card item">
+      <div class="txt"><b>${esc(title)}</b><p>${esc(desc)}</p>${meta}</div>
+      <div class="ops">
+        ${canOrder?`<button class="iop" data-up="${i}" ${i===0?'disabled':''}>↑</button><button class="iop" data-down="${i}" ${i===items.length-1?'disabled':''}>↓</button>`:''}
+        <button class="iop" data-edit="${it.id}">✎</button>
+        <button class="iop" data-del="${it.id}" style="color:var(--danger)">✕</button>
+      </div></div>`;
+  };
+
+  $view().innerHTML=`
+    <div class="subtabs">${tabs.map(([k,l])=>`<button data-t="${k}" class="${t===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="fab-row"><button class="btn btn-honey" id="add">+ Adicionar</button></div>
+    ${items.length?items.map(row).join(''):'<div class="card muted" style="text-align:center;padding:26px">Nada cadastrado nesta seção ainda.</div>'}`;
+  document.querySelectorAll('[data-t]').forEach(b=>b.addEventListener('click',()=>{S.subtab=b.dataset.t;viewGuide()}));
+  document.getElementById('add').addEventListener('click',()=>guideForm(t,null));
+  $view().querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>guideForm(t,items.find(x=>x.id===b.dataset.edit))));
+  $view().querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',async()=>{
+    if(!confirm('Excluir este item?'))return;
+    const table=t==='rules'?'rules':t==='tips'?'tips':t==='faq'?'faq_items':'steps';
+    await sb.from(table).delete().eq('id',b.dataset.del);viewGuide();
+  }));
+  const swap=async(i,j)=>{
+    const table=t==='rules'?'rules':t==='faq'?'faq_items':'steps';
+    const a=items[i],b2=items[j];
+    await Promise.all([
+      sb.from(table).update({ord:j}).eq('id',a.id),
+      sb.from(table).update({ord:i}).eq('id',b2.id)
+    ]);viewGuide();
+  };
+  $view().querySelectorAll('[data-up]').forEach(b=>b.addEventListener('click',()=>swap(+b.dataset.up,+b.dataset.up-1)));
+  $view().querySelectorAll('[data-down]').forEach(b=>b.addEventListener('click',()=>swap(+b.dataset.down,+b.dataset.down+1)));
+}
+
+function guideForm(t,it){
+  const isStep=(t==='checkin'||t==='checkout'),isTip=t==='tips',isFaq=t==='faq';
+  openModal(`
+    <div class="close-row"><h3>${it?'Editar':'Adicionar'} ${isStep?(t==='checkin'?'passo de chegada':'passo de saída'):isTip?'dica':isFaq?'pergunta':'regra'}</h3><button class="x">✕</button></div>
+    ${isTip?`<label>Categoria</label><input id="g-cat" placeholder="Restaurantes, Mercados, Lazer…" value="${esc(it?.category||'')}">`:''}
+    <label>${isFaq?'Pergunta':'Título'}</label><input id="g-title" value="${esc(it?.title||it?.question||'')}">
+    <label>${isFaq?'Resposta':'Descrição'}</label><textarea id="g-desc">${esc(it?.description||it?.answer||'')}</textarea>
+    ${isTip?`<label>Link do Google Maps (opcional)</label><input id="g-maps" value="${esc(it?.maps_url||'')}">`:''}
+    ${isStep?`<label>Vídeo (opcional — cole o link do YouTube "não listado")</label>
+    <input id="g-video" placeholder="https://youtu.be/…" value="${esc(it?.video_url||'')}">
+    <label>Foto (opcional — ex.: vaga da garagem, local do lixo)</label>
+    <input id="g-photo" type="file" accept="image/*">
+    ${it?.photo_url?`<div style="margin-top:10px"><img src="${esc(it.photo_url)}" style="width:100%;border-radius:10px" alt=""><button class="abtn warn" id="g-photo-del" style="margin-top:8px">Remover foto atual</button></div>`:''}
+    <div class="check-row"><input type="checkbox" id="g-conf" ${it?.requires_confirmation?'checked':''}><span>Hóspede precisa confirmar que fez este passo</span></div>`:''}
+    <button class="btn btn-honey btn-block" id="g-save" style="margin-top:18px">Salvar</button>`);
+  let removePhoto=false;
+  const pd=document.getElementById('g-photo-del');
+  if(pd)pd.addEventListener('click',()=>{removePhoto=true;pd.textContent='Foto será removida ao salvar';pd.disabled=true});
+  document.getElementById('g-save').addEventListener('click',async()=>{
+    const title=document.getElementById('g-title').value.trim();
+    const desc=document.getElementById('g-desc').value.trim();
+    if(!title)return toast('Preencha o título');
+    let table,row;
+    if(isStep){
+      table='steps';row={property_id:S.propId,kind:t,title,description:desc,requires_confirmation:document.getElementById('g-conf').checked,video_url:document.getElementById('g-video').value.trim()||null};
+      const file=document.getElementById('g-photo').files[0];
+      const btn=document.getElementById('g-save');
+      if(file){
+        btn.disabled=true;btn.textContent='Enviando foto…';
+        try{row.photo_url=await compressUpload(file,S.propId+'/passo-'+Date.now()+'.jpg')}
+        catch(e){btn.disabled=false;btn.textContent='Salvar';return toast('Falha ao enviar a foto')}
+      } else if(removePhoto){row.photo_url=null}
+      else if(it&&it.photo_url){row.photo_url=it.photo_url}
+    }
+    else if(t==='rules'){table='rules';row={property_id:S.propId,title,description:desc}}
+    else if(isTip){table='tips';row={property_id:S.propId,category:document.getElementById('g-cat').value.trim()||'Geral',title,description:desc,maps_url:document.getElementById('g-maps').value.trim()||null}}
+    else{table='faq_items';row={property_id:S.propId,question:title,answer:desc}}
+    if(!it&&table!=='tips'){const {count}=await sb.from(table).select('*',{count:'exact',head:true}).eq('property_id',S.propId);row.ord=(count||0)}
+    const q=it?sb.from(table).update(row).eq('id',it.id):sb.from(table).insert(row);
+    const {error}=await q;
+    if(error)return toast('Erro ao salvar');
+    closeModal();viewGuide();
+  });
+}
+
+/* ---------- Mensagens (templates) ---------- */
+async function viewMsgs(){
+  const {data}=await sb.from('message_templates').select('*').eq('property_id',S.propId);
+  const cur=k=>{const t=(data||[]).find(x=>x.kind===k);return t?t.body:KINDS_MSG.find(x=>x.kind===k).body};
+  $view().innerHTML=`
+    <div class="sec-title"><h2>Modelos de mensagem</h2><div class="rule"></div></div>
+    <p class="small muted" style="margin-bottom:14px">Usados nos botões de WhatsApp das reservas. Variáveis disponíveis: <span class="mono">{nome} {imovel} {link} {checkin} {checkout} {hora_checkin} {hora_checkout} {wifi} {senha_wifi} {reviewlink}</span></p>
+    ${KINDS_MSG.map(k=>`<div class="card"><label style="margin-top:0">${k.label}</label><textarea data-tpl="${k.kind}" rows="5">${esc(cur(k.kind))}</textarea></div>`).join('')}
+    <button class="btn btn-honey btn-block" id="m-save">Salvar modelos</button>`;
+  document.getElementById('m-save').addEventListener('click',async()=>{
+    const rows=[...document.querySelectorAll('[data-tpl]')].map(t=>({property_id:S.propId,kind:t.dataset.tpl,body:t.value}));
+    const {error}=await sb.from('message_templates').upsert(rows,{onConflict:'property_id,kind'});
+    toast(error?'Erro ao salvar':'Modelos salvos');
+  });
+}
+
+/* ---------- Imóvel ---------- */
+async function viewProp(){
+  const p=prop();
+  const f=(id,label,val,ph='',type='text')=>`<label>${label}</label><input id="${id}" type="${type}" placeholder="${ph}" value="${esc(val||'')}">`;
+  $view().innerHTML=`
+    <div class="fab-row"><button class="btn btn-outline" id="p-new">+ Novo imóvel</button></div>
+    <div class="card">
+      ${f('p-name','Nome do imóvel',p.name,'Ex.: Studio D Haus 308')}
+      <label>Foto de capa (opcional — aparece no topo do guia do hóspede)</label>
+      <input id="p-cover" type="file" accept="image/*">
+      ${p.cover_url?`<img src="${esc(p.cover_url)}" style="width:100%;border-radius:10px;margin-top:8px" alt="">`:''}
+      ${f('p-addr','Endereço completo',p.address)}
+      ${f('p-maps','Link do Google Maps',p.maps_url,'https://maps.app.goo.gl/…')}
+      <label>Mensagem de boas-vindas (aparece no topo do guia)</label><textarea id="p-welcome">${esc(p.welcome_message||'')}</textarea>
+      <div class="grid2">
+        <div>${f('p-cin','Hora do check-in',p.check_in_time,'15:00')}</div>
+        <div>${f('p-cout','Hora do check-out',p.check_out_time,'11:00')}</div>
+      </div>
+      ${f('p-max','Máximo de hóspedes',p.max_guests,'','number')}
+      <div class="grid2">
+        <div>${f('p-wifi','Rede Wi-Fi',p.wifi_name)}</div>
+        <div>${f('p-pass','Senha do Wi-Fi',p.wifi_password)}</div>
+      </div>
+      ${f('p-phone','Seu WhatsApp (contato do hóspede)',p.contact_phone,'34 99999-9999')}
+      ${f('p-review','Link para avaliação (Airbnb)',p.review_url,'https://…')}
+      <label>Instruções gerais de saída (texto livre)</label><textarea id="p-conotes">${esc(p.checkout_notes||'')}</textarea>
+      ${f('p-ical','URL do calendário iCal do Airbnb',p.ical_url,'https://www.airbnb.com.br/calendar/ical/…')}
+      <p class="small muted" style="margin-top:6px">No Airbnb: Calendário → Disponibilidade → Conectar a outro site → Copiar link.</p>
+      <button class="btn btn-honey btn-block" id="p-save" style="margin-top:18px">Salvar imóvel</button>
+      <button class="btn btn-outline btn-block" id="p-backup" style="margin-top:10px">⬇ Exportar backup de todos os meus dados</button>
+      <button class="btn btn-danger btn-block" id="p-del" style="margin-top:10px">Excluir este imóvel</button>
+    </div>`;
+  document.getElementById('p-save').addEventListener('click',async()=>{
+    const row={name:v('p-name'),address:v('p-addr'),maps_url:v('p-maps')||null,welcome_message:v('p-welcome')||null,
+      check_in_time:v('p-cin')||'15:00',check_out_time:v('p-cout')||'11:00',max_guests:parseInt(v('p-max'))||2,
+      wifi_name:v('p-wifi'),wifi_password:v('p-pass'),contact_phone:v('p-phone')||null,
+      review_url:v('p-review')||null,checkout_notes:v('p-conotes')||null,ical_url:v('p-ical')||null};
+    const cf=document.getElementById('p-cover').files[0];
+    const btn=document.getElementById('p-save');
+    if(cf){
+      btn.disabled=true;btn.textContent='Enviando foto…';
+      try{row.cover_url=await compressUpload(cf,S.propId+'/capa.jpg')+'?v='+Date.now()}
+      catch(e){btn.disabled=false;btn.textContent='Salvar imóvel';return toast('Falha ao enviar a foto de capa')}
+    }
+    const {error}=await sb.from('properties').update(row).eq('id',S.propId);
+    if(error)return toast('Erro ao salvar');
+    Object.assign(prop(),row);toast('Imóvel salvo');render();
+  });
+  function v(id){return document.getElementById(id).value.trim()}
+  document.getElementById('p-backup').addEventListener('click',async()=>{
+    toast('Gerando backup…');
+    const tables=['properties','reservations','steps','rules','tips','faq_items','message_templates','notifications','confirmations'];
+    const dump={sistema:'Vila Stay',gerado_em:new Date().toISOString()};
+    for(const t of tables){const {data}=await sb.from(t).select('*');dump[t]=data||[]}
+    const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='vilastay-backup-'+todayStr()+'.json';
+    a.click();URL.revokeObjectURL(a.href);
+    toast('Backup baixado');
+  });
+  document.getElementById('p-new').addEventListener('click',async()=>{
+    const name=window.prompt('Nome do novo imóvel:');if(!name)return;
+    const {data,error}=await sb.from('properties').insert({name}).select().single();
+    if(!error){S.props.push(data);S.propId=data.id;localStorage.setItem('vs_prop',S.propId);render();toast('Imóvel criado')}
+  });
+  document.getElementById('p-del').addEventListener('click',async()=>{
+    if(S.props.length<=1)return toast('Você precisa ter ao menos um imóvel');
+    if(!confirm('Excluir "'+(p.name||'imóvel')+'" e TODOS os seus dados (reservas, guia, mensagens)? Esta ação não tem volta.'))return;
+    await sb.from('properties').delete().eq('id',S.propId);
+    S.props=S.props.filter(x=>x.id!==S.propId);S.propId=S.props[0].id;render();toast('Imóvel excluído');
+  });
+}
+
+boot();
+</script>
+
+</body>
+</html>
