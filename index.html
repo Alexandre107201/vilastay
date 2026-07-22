@@ -615,6 +615,8 @@ async function viewProp(){
         <div>${f('p-pass','Senha do Wi-Fi',p.wifi_password)}</div>
       </div>
       ${f('p-phone','Seu WhatsApp (contato do hóspede)',p.contact_phone,'34 99999-9999')}
+      <label>Contato de emergência do condomínio (síndico/portaria — opcional)</label>
+      <input id="p-emerg" placeholder="34 99999-9999" value="${esc(p.emergency_contact||'')}">
       ${f('p-review','Link para avaliação (Airbnb)',p.review_url,'https://…')}
       <label>Instruções gerais de saída (texto livre)</label><textarea id="p-conotes">${esc(p.checkout_notes||'')}</textarea>
       ${f('p-ical','URL do calendário iCal do Airbnb',p.ical_url,'https://www.airbnb.com.br/calendar/ical/…')}
@@ -627,6 +629,7 @@ async function viewProp(){
     const row={name:v('p-name'),address:v('p-addr'),maps_url:v('p-maps')||null,welcome_message:v('p-welcome')||null,
       check_in_time:v('p-cin')||'15:00',check_out_time:v('p-cout')||'11:00',max_guests:parseInt(v('p-max'))||2,
       wifi_name:v('p-wifi'),wifi_password:v('p-pass'),contact_phone:v('p-phone')||null,
+      emergency_contact:v('p-emerg')||null,
       review_url:v('p-review')||null,checkout_notes:v('p-conotes')||null,ical_url:v('p-ical')||null};
     const cf=document.getElementById('p-cover').files[0];
     const btn=document.getElementById('p-save');

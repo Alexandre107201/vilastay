@@ -86,6 +86,21 @@ section{margin:30px 0}
 .confirm-btn{margin-top:10px;border:1.5px solid var(--green);background:transparent;color:var(--green);font-weight:600;font-size:13.5px;padding:7px 14px;border-radius:999px;transition:all .15s}
 .confirm-btn.done{background:var(--green);color:#fff;border-color:var(--green)}
 
+/* Checklist de saída */
+.checklist{padding:4px 6px}
+.check-item{display:flex;gap:13px;align-items:flex-start;padding:15px 10px;border-bottom:1px solid var(--line);transition:opacity .15s}
+.check-item:last-child{border-bottom:none}
+.check-item.clickable{cursor:pointer}
+.check-item.clickable:active{opacity:.7}
+.check-mark{flex:0 0 26px;height:26px;margin-top:1px;border-radius:7px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:transparent}
+.check-item.clickable .check-mark{border-color:var(--green);color:var(--green)}
+.check-item.done .check-mark{background:var(--green);border-color:var(--green);color:#fff}
+.check-item:not(.clickable) .check-mark{border:none;color:var(--honey);font-size:22px;line-height:1}
+.check-body{flex:1}
+.check-body b{display:block;font-weight:700;font-size:16px}
+.check-body p{color:var(--dim);font-size:14.5px;white-space:pre-line;margin-top:2px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+
 /* Wifi */
 .wifi{background:var(--ink);color:#F2EFE6;border:none}
 .wifi .label{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#A9B8AC;margin-bottom:3px}
@@ -106,6 +121,10 @@ section{margin:30px 0}
 .tip b{display:block}
 .tip p{color:var(--dim);font-size:14.5px;white-space:pre-line}
 .tip a{font-size:13.5px;font-weight:600;text-decoration:none;display:inline-block;margin-top:4px}
+.emerg-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0}
+.emerg-row + .emerg-row{border-top:1px solid var(--line)}
+.emerg-row b{font-size:15px}
+.emerg-row a{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15.5px;text-decoration:none;background:var(--green-soft);color:var(--green);padding:5px 12px;border-radius:8px}
 details{border-bottom:1px solid var(--line);padding:4px 0}
 summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;font-weight:600;cursor:pointer}
 summary::after{content:"+";font-family:'IBM Plex Mono',monospace;color:var(--honey);font-size:18px}
@@ -136,7 +155,8 @@ footer .name{font-family:'Marcellus',serif;letter-spacing:.14em;text-transform:u
 
 <script>
 const CFG = window.VILASTAY_CONFIG;
-const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+const CFG_OK = !!(CFG && CFG.SUPABASE_URL && !CFG.SUPABASE_URL.startsWith('COLE_AQUI'));
+const sb = CFG_OK ? supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
 const $app = document.getElementById('app');
 let D = null;   // dados do portal
 let TOKEN = new URLSearchParams(location.search).get('t') || '';
@@ -197,6 +217,24 @@ function render(){
       </div>
     </div>`;
 
+  const checkoutSteps = D.checkout_steps || [];
+  const requiredIds = checkoutSteps.filter(s => s.requires_confirmation).map(s => s.id);
+  const allRequiredDone = requiredIds.every(id => confirmed.has(id));
+  const checklistRow = (s) => {
+    const isConfirmable = !!s.requires_confirmation;
+    const isDone = confirmed.has(s.id);
+    return `
+    <div class="check-item ${isDone?'done':''} ${isConfirmable?'clickable':''}" ${isConfirmable?`data-step="${s.id}"`:''}>
+      <div class="check-mark">${isConfirmable ? (isDone?'✓':'') : '•'}</div>
+      <div class="check-body">
+        <b>${esc(s.title)}</b>
+        <p>${esc(s.description)}</p>
+        ${s.photo_url ? `<img class="step-photo" src="${esc(s.photo_url)}" alt="Foto: ${esc(s.title)}" loading="lazy">` : ''}
+        ${videoEmbed(s.video_url)}
+      </div>
+    </div>`;
+  };
+
   const tipsByCat = {};
   (D.tips||[]).forEach(t => { (tipsByCat[t.category] = tipsByCat[t.category] || []).push(t); });
 
@@ -229,6 +267,7 @@ function render(){
       <a href="#chegada">Chegada</a>
       <a href="#wifi">Wi-Fi</a>
       ${(D.rules||[]).length ? '<a href="#regras">Regras</a>' : ''}
+      <a href="#emergencia">Emergências</a>
       ${(D.tips||[]).length ? '<a href="#dicas">Dicas</a>' : ''}
       ${(D.faq||[]).length ? '<a href="#faq">Dúvidas</a>' : ''}
       <a href="#saida">Saída</a>
@@ -254,6 +293,17 @@ function render(){
       <div class="card">${D.rules.map(x => `<div class="rule-item"><div class="dot"></div><div><b>${esc(x.title)}</b><p>${esc(x.description)}</p></div></div>`).join('')}</div>
     </section>` : ''}
 
+    <section id="emergencia">
+      <div class="sec-head"><h2>Emergências</h2><div class="rule"></div></div>
+      <div class="card">
+        <div class="emerg-row"><b>SAMU</b><a href="tel:192">192</a></div>
+        <div class="emerg-row"><b>Bombeiros</b><a href="tel:193">193</a></div>
+        <div class="emerg-row"><b>Polícia Militar</b><a href="tel:190">190</a></div>
+        ${p.emergency_contact ? `<div class="emerg-row"><b>Condomínio / Portaria</b><a href="tel:${esc(String(p.emergency_contact).replace(/\\D/g,''))}">${esc(p.emergency_contact)}</a></div>` : ''}
+      </div>
+      ${p.emergency_contact ? `<a class="btn btn-outline btn-block" style="margin-top:10px" href="${waLink(p.emergency_contact, 'Olá! Sou hóspede do ' + (p.name||'apartamento') + ' e preciso de ajuda.')}" target="_blank" rel="noopener">💬 Chamar o condomínio no WhatsApp</a>` : ''}
+    </section>
+
     ${(D.tips||[]).length ? `
     <section id="dicas">
       <div class="sec-head"><h2>Dicas do anfitrião</h2><div class="rule"></div></div>
@@ -271,13 +321,13 @@ function render(){
 
     <section id="saida">
       <div class="sec-head"><h2>Saída</h2><div class="rule"></div></div>
-      ${p.checkout_notes ? `<div class="card small muted" style="white-space:pre-line">${esc(p.checkout_notes)}</div>` : ''}
-      ${(D.checkout_steps||[]).map(stepHtml).join('')}
+      ${p.checkout_notes ? `<div class="card small muted" style="white-space:pre-line;margin-bottom:12px">${esc(p.checkout_notes)}</div>` : ''}
+      ${checkoutSteps.length ? `<div class="card checklist">${checkoutSteps.map(checklistRow).join('')}</div>` : ''}
       <div style="margin-top:14px">
         ${D.checkout_done
           ? `<div class="done-banner">✓ Saída confirmada. Obrigado pela estadia!</div>`
-          : `<button class="btn btn-green btn-block" id="btn-checkout">🏠 Concluí a saída — avisar o anfitrião</button>
-             <p class="small muted" style="text-align:center;margin-top:8px">Toque quando já tiver saído do apartamento.</p>`}
+          : `<button class="btn btn-green btn-block" id="btn-checkout" ${allRequiredDone ? '' : 'disabled aria-disabled="true"'}>🏠 Concluí a saída — avisar o anfitrião</button>
+             <p class="small muted" style="text-align:center;margin-top:8px">${allRequiredDone ? 'Toque quando já tiver saído do apartamento.' : 'Confirme todos os itens acima para liberar este botão.'}</p>`}
         ${(isCheckoutDay || D.checkout_done) && p.review_url ? `<a class="btn btn-honey btn-block" style="margin-top:12px" href="${esc(p.review_url)}" target="_blank" rel="noopener">⭐ Avaliar a estadia</a>` : ''}
       </div>
     </section>
@@ -312,6 +362,17 @@ function bind(){
     if (data && data.ok){ b.classList.add('done'); b.textContent = '✓ Confirmado'; }
   }));
 
+  document.querySelectorAll('.check-item.clickable').forEach(row => row.addEventListener('click', async () => {
+    if (row.classList.contains('done')) return;
+    row.style.opacity = '.55';
+    const { data } = await sb.rpc('guest_confirm_step', { p_token: TOKEN, p_step_id: row.dataset.step });
+    if (data && data.ok){
+      D.confirmed_step_ids = [...(D.confirmed_step_ids||[]), row.dataset.step];
+      render();
+      const s = document.getElementById('saida'); if (s) s.scrollIntoView({ block: 'start' });
+    } else { row.style.opacity = ''; }
+  }));
+
   const co = document.getElementById('btn-checkout');
   if (co) co.addEventListener('click', async () => {
     if (!confirm('Confirmar que você já concluiu a saída do apartamento?')) return;
@@ -322,7 +383,7 @@ function bind(){
   });
 }
 
-if (!CFG || CFG.SUPABASE_URL.startsWith('COLE_AQUI')){
+if (!CFG_OK){
   stateScreen('⚙️','Configuração pendente','O arquivo config.js ainda não foi preenchido com os dados do Supabase.');
 } else {
   load();
