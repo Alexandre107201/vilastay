@@ -357,6 +357,7 @@ async function viewDash(){
       <div class="stat"><div class="v">${revenue?'R$'+revenue.toLocaleString('pt-BR'):'—'}</div><div class="l">Receita do mês</div></div>
     </div>
     ${!nightsComRevenue?'<p class="small muted" style="text-align:center;margin-top:-8px">Cadastre a diária nas reservas deste mês para ver receita e diária média.</p>':''}
+    <button class="btn btn-outline btn-block" id="btn-history" style="margin-bottom:14px">📊 Ver histórico completo</button>
     <div class="sec-title"><h2>Quadro dos próximos 7 dias</h2><div class="rule"></div></div>
     <div class="card board">${board}</div>
     <p class="small muted" style="text-align:center">O quadro mostra todos os imóveis. O financeiro acima segue o imóvel selecionado no topo.</p>`;
@@ -364,9 +365,65 @@ async function viewDash(){
     await sb.from('notifications').update({dismissed:true}).eq('id',b.dataset.dismiss);
     b.closest('.notif').remove();
   }));
+  document.getElementById('btn-history').addEventListener('click',()=>{S.view='history';renderHistory()});
 }
 
-/* ---------- Reservas ---------- */
+/* ---------- Histórico completo ---------- */
+async function renderHistory(){
+  $app.innerHTML=`
+  <div class="topbar">
+    <button class="out" id="back-hist" style="font-size:22px">←</button>
+    <div class="brand" style="margin-left:6px"><span class="name">Histórico — ${esc(prop()?.name||'')}</span></div>
+  </div>
+  <main id="view" style="padding-bottom:40px"><div class="spinner"></div></main>`;
+  document.getElementById('back-hist').addEventListener('click',()=>{S.view='dash';render()});
+
+  const {data}=await sb.from('reservations').select('check_in,check_out,total_amount,nightly_rate,guest_name').eq('property_id',S.propId).order('check_in',{ascending:true});
+  const res=(data||[]).filter(r=>r.check_in<=todayStr());
+
+  let totalReceita=0,totalNoites=0,totalReservas=res.length;
+  const porMes={};
+  res.forEach(r=>{
+    const n=nights(r.check_in,r.check_out);
+    const valor=r.total_amount!=null?Number(r.total_amount):(r.nightly_rate!=null?Number(r.nightly_rate)*n:0);
+    totalReceita+=valor;totalNoites+=n;
+    const mesKey=r.check_in.slice(0,7);
+    if(!porMes[mesKey])porMes[mesKey]={receita:0,noites:0,reservas:0};
+    porMes[mesKey].receita+=valor;porMes[mesKey].noites+=n;porMes[mesKey].reservas+=1;
+  });
+  const meses=Object.keys(porMes).sort().reverse();
+  const maxReceita=Math.max(...meses.map(m=>porMes[m].receita),1);
+  const adrGeral=totalNoites?Math.round(totalReceita/totalNoites):0;
+  const nomeMes=k=>{const[y,m]=k.split('-');return MESES[parseInt(m)-1]+'/'+y.slice(2)};
+
+  $view().innerHTML=`
+    <div class="stats">
+      <div class="stat"><div class="v">${totalReservas}</div><div class="l">Reservas</div></div>
+      <div class="stat"><div class="v">${totalNoites}</div><div class="l">Noites vendidas</div></div>
+      <div class="stat"><div class="v">R$${adrGeral}</div><div class="l">Diária média geral</div></div>
+    </div>
+    <div class="card" style="text-align:center;margin-bottom:16px">
+      <div class="small muted" style="text-transform:uppercase;letter-spacing:.06em">Receita total (histórico completo)</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:32px;color:var(--honey);margin-top:4px">R$${totalReceita.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+    </div>
+    <div class="sec-title"><h2>Receita por mês</h2><div class="rule"></div></div>
+    <div class="card">
+      ${meses.map(m=>{
+        const d=porMes[m];
+        const pct=Math.max(4,Math.round(100*d.receita/maxReceita));
+        return `<div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px">
+            <span>${nomeMes(m)} <span class="muted">(${d.reservas} reserva${d.reservas>1?'s':''})</span></span>
+            <b class="mono">R$${d.receita.toLocaleString('pt-BR',{maximumFractionDigits:0})}</b>
+          </div>
+          <div style="background:var(--panel2);border-radius:6px;height:10px;overflow:hidden">
+            <div style="background:var(--honey);height:100%;width:${pct}%"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="small muted" style="text-align:center">Baseado em ${totalReservas} reservas com data de check-in até hoje. Reservas sem diária/valor total cadastrado entram como R$0.</p>`;
+}
 async function viewResv(){
   const p=prop();
   const {data}=await sb.from('reservations').select('*').eq('property_id',S.propId).order('check_in',{ascending:false});
