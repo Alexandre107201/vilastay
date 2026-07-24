@@ -1,4 +1,4 @@
-# Vila Stay — Gestão de apartamentos Airbnb
+# Maac Empreendimentos — Gestão de apartamentos Airbnb
 
 Sistema completo de gestão de hospedagem: painel do anfitrião protegido por senha + guia digital do hóspede com link exclusivo por reserva.
 
