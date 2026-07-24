@@ -386,7 +386,7 @@ async function viewResv(){
       <div class="card resv">
         <div class="head"><b>${esc(r.guest_name)}</b><span class="pill ${cls}">${lbl}</span></div>
         <div class="dates">${fmtBRfull(r.check_in)} → ${fmtBRfull(r.check_out)}</div>
-        <div class="src">${r.source==='ical'?'Importada do Airbnb':'Cadastro manual'}${r.phone?' · '+esc(r.phone):''}${r.nightly_rate?' · R$'+r.nightly_rate+'/noite':''}</div>
+        <div class="src">${r.source==='ical'?'Importada do Airbnb':'Cadastro manual'}${r.phone?' · '+esc(r.phone):''}${r.total_amount?' · R$'+r.total_amount+' total':(r.nightly_rate?' · R$'+r.nightly_rate+'/noite':'')}</div>
         <div class="small" style="margin-top:2px">${r.viewed_at?'<span style="color:var(--ok)">✓ Hóspede visualizou o guia</span>':'<span class="muted">Guia ainda não visualizado</span>'}</div>
         <div class="actions">
           <button class="abtn" data-link="${r.id}">🔗 Link do guia</button>
@@ -415,15 +415,19 @@ function resvForm(r){
       <div><label>Check-in</label><input id="f-in" type="date" value="${r?.check_in||''}"></div>
       <div><label>Check-out</label><input id="f-out" type="date" value="${r?.check_out||''}"></div>
     </div>
-    <label>Diária (R$, opcional — usado no financeiro)</label><input id="f-rate" type="number" inputmode="decimal" placeholder="Ex.: 209" value="${r?.nightly_rate??''}">
+    <label>Valor total pago (R$) — o mais preciso, pega em Airbnb → Reservas → "Pagamento total"</label><input id="f-total" type="number" inputmode="decimal" placeholder="Ex.: 1305.98" value="${r?.total_amount??''}">
+    <label>OU diária (R$, se preferir estimar por noite)</label><input id="f-rate" type="number" inputmode="decimal" placeholder="Ex.: 209" value="${r?.nightly_rate??''}">
+    <p class="small muted" style="margin-top:-8px">Se preencher os dois, o valor total tem prioridade no cálculo do financeiro.</p>
     <label>Observações</label><textarea id="f-notes">${esc(r?.notes||'')}</textarea>
     <button class="btn btn-honey btn-block" id="f-save" style="margin-top:18px">Salvar reserva</button>`);
   document.getElementById('f-save').addEventListener('click',async()=>{
     const rate=document.getElementById('f-rate').value;
+    const total=document.getElementById('f-total').value;
     const row={property_id:S.propId,guest_name:document.getElementById('f-name').value.trim(),
       phone:document.getElementById('f-phone').value.trim()||null,
       check_in:document.getElementById('f-in').value,check_out:document.getElementById('f-out').value,
       nightly_rate:rate?parseFloat(rate):null,
+      total_amount:total?parseFloat(total):null,
       notes:document.getElementById('f-notes').value.trim()||null};
     if(!row.guest_name||!row.check_in||!row.check_out)return toast('Preencha nome e datas');
     if(row.check_out<=row.check_in)return toast('Check-out deve ser após o check-in');
