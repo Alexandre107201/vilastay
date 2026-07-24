@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0F1D17">
 <link rel="apple-touch-icon" href="icon-512.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vila Stay — Painel do anfitrião</title>
+<title>Maac Empreendimentos — Painel do anfitrião</title>
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -779,12 +779,12 @@ async function viewProp(){
   document.getElementById('p-backup').addEventListener('click',async()=>{
     toast('Gerando backup…');
     const tables=['properties','reservations','steps','rules','tips','faq_items','message_templates','notifications','confirmations'];
-    const dump={sistema:'Vila Stay',gerado_em:new Date().toISOString()};
+    const dump={sistema:'Maac Empreendimentos',gerado_em:new Date().toISOString()};
     for(const t of tables){const {data}=await sb.from(t).select('*');dump[t]=data||[]}
     const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download='vilastay-backup-'+todayStr()+'.json';
+    a.download='maac-backup-'+todayStr()+'.json';
     a.click();URL.revokeObjectURL(a.href);
     toast('Backup baixado');
   });
