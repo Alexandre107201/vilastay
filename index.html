@@ -42,8 +42,8 @@ main{max-width:760px;margin:0 auto;padding:18px 16px 96px}
 
 /* Bottom nav */
 .tabs{position:fixed;bottom:0;left:0;right:0;z-index:30;background:var(--panel);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
-.tabs button{flex:1;background:none;border:none;color:var(--dim);font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:10px}
-.tabs button .ico{font-size:19px}
+.tabs button{flex:1;background:none;border:none;color:var(--dim);font-size:10px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 1px;border-radius:10px;white-space:nowrap}
+.tabs button .ico{font-size:17px}
 .tabs button.on{color:var(--honey)}
 
 /* Cards & layout */
@@ -284,7 +284,7 @@ async function createFirstProperty(){
 
 /* ---------- Shell ---------- */
 function render(){
-  const tabs=[['dash','⌂','Painel'],['resv','⇄','Reservas'],['guide','☰','Guia'],['msgs','✉','Mensagens'],['prop','⚙','Imóvel']];
+  const tabs=[['dash','⌂','Painel'],['resv','⇄','Reservas'],['clean','🧹','Limpeza'],['guide','☰','Guia'],['msgs','✉','Mensagens'],['prop','⚙','Imóvel']];
   $app.innerHTML=`
   <div class="topbar">
     <div class="brand"><span class="mark"></span><span class="name">${esc(CFG.BRAND)}</span></div>
@@ -296,7 +296,7 @@ function render(){
   document.getElementById('prop-sel').addEventListener('change',e=>{S.propId=e.target.value;localStorage.setItem('vs_prop',S.propId);render()});
   document.getElementById('logout').addEventListener('click',()=>sb.auth.signOut());
   document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{S.view=b.dataset.v;render()}));
-  ({dash:viewDash,resv:viewResv,guide:viewGuide,msgs:viewMsgs,prop:viewProp})[S.view]();
+  ({dash:viewDash,resv:viewResv,clean:viewClean,guide:viewGuide,msgs:viewMsgs,prop:viewProp})[S.view]();
 }
 const $view=()=>document.getElementById('view');
 
@@ -312,6 +312,22 @@ async function viewDash(){
   const staying=res.filter(r=>r.check_in<=today&&r.check_out>today);
   const arr7=res.filter(r=>r.check_in>=today&&r.check_in<=end);
   const dep7=res.filter(r=>r.check_out>=today&&r.check_out<=end);
+
+  // Financeiro do mês, do imóvel selecionado no topo
+  const now=new Date();
+  const monthStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const monthEnd=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(daysInMonth).padStart(2,'0');
+  const {data:monthRes}=await sb.from('reservations').select('check_in,check_out,nightly_rate,total_amount').eq('property_id',S.propId).gte('check_in',monthStart).lte('check_in',monthEnd);
+  let nightsBooked=0,revenue=0,nightsComRevenue=0;
+  (monthRes||[]).forEach(r=>{
+    const n=nights(r.check_in,r.check_out);
+    nightsBooked+=n;
+    if(r.total_amount){revenue+=Number(r.total_amount);nightsComRevenue+=n}
+    else if(r.nightly_rate){revenue+=Number(r.nightly_rate)*n;nightsComRevenue+=n}
+  });
+  const ocupacao=daysInMonth?Math.round(100*nightsBooked/daysInMonth):0;
+  const adr=nightsComRevenue?Math.round(revenue/nightsComRevenue):null;
 
   let board='';
   for(let i=0;i<=7;i++){
@@ -333,9 +349,16 @@ async function viewDash(){
       <div class="stat"><div class="v">${arr7.length}</div><div class="l">Chegadas 7d</div></div>
       <div class="stat"><div class="v">${dep7.length}</div><div class="l">Saídas 7d</div></div>
     </div>
+    <div class="sec-title"><h2>Financeiro do mês — ${esc(prop()?.name||'')}</h2><div class="rule"></div></div>
+    <div class="stats">
+      <div class="stat"><div class="v">${ocupacao}%</div><div class="l">Ocupação</div></div>
+      <div class="stat"><div class="v">${adr?'R$'+adr:'—'}</div><div class="l">Diária média</div></div>
+      <div class="stat"><div class="v">${revenue?'R$'+revenue.toLocaleString('pt-BR'):'—'}</div><div class="l">Receita do mês</div></div>
+    </div>
+    ${!nightsComRevenue?'<p class="small muted" style="text-align:center;margin-top:-8px">Cadastre a diária nas reservas deste mês para ver receita e diária média.</p>':''}
     <div class="sec-title"><h2>Quadro dos próximos 7 dias</h2><div class="rule"></div></div>
     <div class="card board">${board}</div>
-    <p class="small muted" style="text-align:center">O quadro mostra todos os imóveis. As demais abas seguem o imóvel selecionado no topo.</p>`;
+    <p class="small muted" style="text-align:center">O quadro mostra todos os imóveis. O financeiro acima segue o imóvel selecionado no topo.</p>`;
   document.querySelectorAll('[data-dismiss]').forEach(b=>b.addEventListener('click',async()=>{
     await sb.from('notifications').update({dismissed:true}).eq('id',b.dataset.dismiss);
     b.closest('.notif').remove();
@@ -362,7 +385,8 @@ async function viewResv(){
       <div class="card resv">
         <div class="head"><b>${esc(r.guest_name)}</b><span class="pill ${cls}">${lbl}</span></div>
         <div class="dates">${fmtBRfull(r.check_in)} → ${fmtBRfull(r.check_out)}</div>
-        <div class="src">${r.source==='ical'?'Importada do Airbnb':'Cadastro manual'}${r.phone?' · '+esc(r.phone):''}</div>
+        <div class="src">${r.source==='ical'?'Importada do Airbnb':'Cadastro manual'}${r.phone?' · '+esc(r.phone):''}${r.nightly_rate?' · R$'+r.nightly_rate+'/noite':''}</div>
+        <div class="small" style="margin-top:2px">${r.viewed_at?'<span style="color:var(--ok)">✓ Hóspede visualizou o guia</span>':'<span class="muted">Guia ainda não visualizado</span>'}</div>
         <div class="actions">
           <button class="abtn" data-link="${r.id}">🔗 Link do guia</button>
           <button class="abtn" data-msg="${r.id}">💬 Mensagens</button>
@@ -390,12 +414,15 @@ function resvForm(r){
       <div><label>Check-in</label><input id="f-in" type="date" value="${r?.check_in||''}"></div>
       <div><label>Check-out</label><input id="f-out" type="date" value="${r?.check_out||''}"></div>
     </div>
+    <label>Diária (R$, opcional — usado no financeiro)</label><input id="f-rate" type="number" inputmode="decimal" placeholder="Ex.: 209" value="${r?.nightly_rate??''}">
     <label>Observações</label><textarea id="f-notes">${esc(r?.notes||'')}</textarea>
     <button class="btn btn-honey btn-block" id="f-save" style="margin-top:18px">Salvar reserva</button>`);
   document.getElementById('f-save').addEventListener('click',async()=>{
+    const rate=document.getElementById('f-rate').value;
     const row={property_id:S.propId,guest_name:document.getElementById('f-name').value.trim(),
       phone:document.getElementById('f-phone').value.trim()||null,
       check_in:document.getElementById('f-in').value,check_out:document.getElementById('f-out').value,
+      nightly_rate:rate?parseFloat(rate):null,
       notes:document.getElementById('f-notes').value.trim()||null};
     if(!row.guest_name||!row.check_in||!row.check_out)return toast('Preencha nome e datas');
     if(row.check_out<=row.check_in)return toast('Check-out deve ser após o check-in');
@@ -592,6 +619,50 @@ async function viewMsgs(){
 }
 
 /* ---------- Imóvel ---------- */
+/* ---------- Limpeza ---------- */
+async function viewClean(){
+  const {data}=await sb.from('cleaning_tasks').select('*, reservations(guest_name,check_out)').eq('property_id',S.propId).order('created_at',{ascending:false});
+  const tasks=data||[];
+  const pending=tasks.filter(t=>t.status==='pending'), done=tasks.filter(t=>t.status==='done');
+
+  const row=(t,isPending)=>`
+    <div class="card resv">
+      <div class="head"><b>${esc(t.reservations?.guest_name||'Hóspede')}</b><span class="pill ${isPending?'soon':'past'}">${isPending?'Pendente':'Concluída'}</span></div>
+      <div class="dates">Checkout: ${fmtBRfull(t.reservations?.check_out)}</div>
+      ${t.photo_url?`<img class="step-thumb" src="${esc(t.photo_url)}" alt="Foto da limpeza" style="width:100%;border-radius:10px;margin-top:8px">`:''}
+      ${isPending?`
+        <input type="file" accept="image/*" id="clean-photo-${t.id}" style="display:none">
+        <div class="actions">
+          <button class="abtn" data-photo="${t.id}">📷 Anexar foto</button>
+          <button class="abtn" data-done="${t.id}" style="color:var(--ok)">✓ Marcar como concluída</button>
+        </div>`:`<div class="small muted" style="margin-top:8px">Concluída em ${t.completed_at?new Date(t.completed_at).toLocaleString('pt-BR'):'-'}</div>`}
+    </div>`;
+
+  $view().innerHTML=`
+    <div class="sec-title"><h2>Pendentes (${pending.length})</h2><div class="rule"></div></div>
+    ${pending.length?pending.map(t=>row(t,true)).join(''):'<div class="card muted" style="text-align:center;padding:24px">Nenhuma limpeza pendente 🎉</div>'}
+    ${done.length?`<div class="sec-title"><h2>Concluídas recentemente</h2><div class="rule"></div></div>${done.slice(0,10).map(t=>row(t,false)).join('')}`:''}
+    <p class="small muted" style="text-align:center;margin-top:10px">Uma tarefa é criada automaticamente sempre que um hóspede confirma a saída pelo guia.</p>`;
+
+  document.querySelectorAll('[data-photo]').forEach(b=>b.addEventListener('click',()=>{
+    document.getElementById('clean-photo-'+b.dataset.photo).click();
+  }));
+  document.querySelectorAll('[id^="clean-photo-"]').forEach(inp=>inp.addEventListener('change',async()=>{
+    const id=inp.id.replace('clean-photo-','');
+    const file=inp.files[0]; if(!file)return;
+    toast('Enviando foto…');
+    try{
+      const url=await compressUpload(file, S.propId+'/limpeza-'+id+'-'+Date.now()+'.jpg');
+      await sb.from('cleaning_tasks').update({photo_url:url}).eq('id',id);
+      toast('Foto anexada'); viewClean();
+    }catch(e){toast('Falha ao enviar a foto')}
+  }));
+  document.querySelectorAll('[data-done]').forEach(b=>b.addEventListener('click',async()=>{
+    await sb.from('cleaning_tasks').update({status:'done',completed_at:new Date().toISOString()}).eq('id',b.dataset.done);
+    toast('Limpeza marcada como concluída'); viewClean();
+  }));
+}
+
 async function viewProp(){
   const p=prop();
   const f=(id,label,val,ph='',type='text')=>`<label>${label}</label><input id="${id}" type="${type}" placeholder="${ph}" value="${esc(val||'')}">`;
