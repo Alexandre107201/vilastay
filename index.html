@@ -314,6 +314,22 @@ async function viewDash(){
   const arr7=res.filter(r=>r.check_in>=today&&r.check_in<=end);
   const dep7=res.filter(r=>r.check_out>=today&&r.check_out<=end);
 
+  // Fila de mensagens pendentes (todos os imóveis, quem tem WhatsApp cadastrado)
+  const {data:queueRes}=await sb.from('reservations').select('*').gte('check_out',addDays(today,-3)).not('phone','is',null);
+  const resvIds=(queueRes||[]).map(r=>r.id);
+  const {data:logs}=resvIds.length?await sb.from('message_log').select('reservation_id,kind').in('reservation_id',resvIds):{data:[]};
+  const sentSet=new Set((logs||[]).map(l=>l.reservation_id+'|'+l.kind));
+  const pendingMsgs=[];
+  (queueRes||[]).forEach(r=>{
+    const add=(kind,cond)=>{if(cond&&!sentSet.has(r.id+'|'+kind))pendingMsgs.push({r,kind})};
+    add('boas_vindas', r.check_in>=today);
+    add('vespera', r.check_in===addDays(today,1));
+    add('dia_checkout', r.check_out===today);
+    add('avaliacao', r.check_out<today);
+  });
+  const ordemPrioridade={dia_checkout:0,vespera:1,boas_vindas:2,avaliacao:3};
+  pendingMsgs.sort((a,b)=>ordemPrioridade[a.kind]-ordemPrioridade[b.kind]);
+
   // Financeiro do mês, do imóvel selecionado no topo
   const now=new Date();
   const monthStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
@@ -345,6 +361,22 @@ async function viewDash(){
 
   $view().innerHTML=`
     ${notifs.map(n=>`<div class="notif"><div style="font-size:20px">🔔</div><div class="txt"><b>Apartamento entregue</b>${esc(n.reservations?.guest_name||'Hóspede')} concluiu o checkout · ${esc(pname(n.reservations?.property_id))}</div><button class="x" data-dismiss="${n.id}" title="Dispensar">✕</button></div>`).join('')}
+    ${pendingMsgs.length?`
+    <div class="sec-title"><h2>Mensagens pendentes (${pendingMsgs.length})</h2><div class="rule"></div></div>
+    <div class="card" style="padding:6px 10px">
+      ${pendingMsgs.map(({r,kind},i)=>{
+        const label=KINDS_MSG.find(k=>k.kind===kind).label;
+        const icone={dia_checkout:'🏠',vespera:'🎉',boas_vindas:'👋',avaliacao:'⭐'}[kind];
+        return `<div class="msg-row" style="display:flex;align-items:center;gap:10px;padding:12px 4px;${i<pendingMsgs.length-1?'border-bottom:1px solid var(--line)':''}">
+          <div style="font-size:20px">${icone}</div>
+          <div style="flex:1">
+            <b style="font-size:14.5px">${esc(r.guest_name)}</b>
+            <div class="small muted">${label} · ${esc(pname(r.property_id))}</div>
+          </div>
+          <button class="abtn" data-sendmsg="${r.id}" data-kind="${kind}">Enviar</button>
+        </div>`;
+      }).join('')}
+    </div>` : ''}
     <div class="stats">
       <div class="stat"><div class="v">${staying.length}</div><div class="l">Hospedados</div></div>
       <div class="stat"><div class="v">${arr7.length}</div><div class="l">Chegadas 7d</div></div>
@@ -366,6 +398,17 @@ async function viewDash(){
     b.closest('.notif').remove();
   }));
   document.getElementById('btn-history').addEventListener('click',()=>{S.view='history';renderHistory()});
+  document.querySelectorAll('[data-sendmsg]').forEach(b=>b.addEventListener('click',async()=>{
+    const r=queueRes.find(x=>x.id===b.dataset.sendmsg);
+    const p=S.props.find(x=>x.id===r.property_id);
+    const kind=b.dataset.kind;
+    const {data:tpl}=await sb.from('message_templates').select('body').eq('property_id',p.id).eq('kind',kind).maybeSingle();
+    const body=fillVars(tpl?.body||KINDS_MSG.find(k=>k.kind===kind).body,r,p);
+    window.open(waLink(r.phone,body),'_blank');
+    await sb.from('message_log').insert({reservation_id:r.id,kind}).select();
+    toast('Marcada como enviada');
+    viewDash();
+  }));
 }
 
 /* ---------- Histórico completo ---------- */
